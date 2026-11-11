@@ -1,0 +1,58 @@
+name: pervye90
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: pervye90
+      MYSQL_USER: pervye
+      MYSQL_PASSWORD: pervye
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Europe/Minsk
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - pervye90_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: mysql+pymysql://pervye:pervye@mysql:3306/pervye90?charset=utf8mb4
+      JWT_SECRET: demo-pervye-90
+      TZ: Europe/Minsk
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pervye90_mysql:
